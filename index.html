@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Stock Hype</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>The Stock Hype</h1>
+      <p class="subtitle">Track social momentum, sentiment, and valuation signals in one place.</p>
+    </header>
+
+    <main>
+      <section class="search-panel">
+        <label for="stockInput">Choose a stock ticker</label>
+        <div class="search-controls">
+          <input id="stockInput" type="text" placeholder="e.g., AAPL, TSLA, NVDA" maxlength="8" />
+          <button id="analyzeBtn">Analyze 30 Days</button>
+        </div>
+        <p class="hint">Demo mode uses simulated social data and sample valuation metrics.</p>
+      </section>
+
+      <section id="analysisSection" class="analysis hidden">
+        <div class="card">
+          <h2 id="chartTitle">Social Mentions (Last 30 Days)</h2>
+          <canvas id="mentionsChart" width="1200" height="420" aria-label="Social mentions graph"></canvas>
+          <div id="chartLegend" class="legend"></div>
+        </div>
+
+        <div class="card sentiment-grid">
+          <div>
+            <h3>Positive Posts</h3>
+            <p id="positiveCount" class="sentiment-count">0</p>
+          </div>
+          <div>
+            <h3>Negative Posts</h3>
+            <p id="negativeCount" class="sentiment-count">0</p>
+          </div>
+          <div>
+            <h3>Sentiment Score</h3>
+            <p id="sentimentScore" class="sentiment-count">0%</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Most Important Social Posts</h3>
+          <ul id="importantPosts" class="posts"></ul>
+        </div>
+
+        <div class="card">
+          <h3>Investment Outlook</h3>
+          <p id="investmentSummary" class="summary"></p>
+          <div class="metrics">
+            <span id="peMetric">P/E: --</span>
+            <span id="dividendMetric">Dividend Yield: --</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
