@@ -13,6 +13,27 @@ const sampleValuation = {
   AMZN: { pe: 50.8, dividend: 0.0 },
 };
 
+const nasdaqStocks = [
+  { symbol: 'AAPL', name: 'Apple Inc.', aliases: ['apple'] },
+  { symbol: 'TSLA', name: 'Tesla, Inc.', aliases: ['tesla'] },
+  { symbol: 'NVDA', name: 'NVIDIA Corporation', aliases: ['nvidia'] },
+  { symbol: 'MSFT', name: 'Microsoft Corporation', aliases: ['microsoft'] },
+  { symbol: 'AMZN', name: 'Amazon.com, Inc.', aliases: ['amazon'] },
+  { symbol: 'GOOG', name: 'Alphabet Inc. Class C', aliases: ['google', 'alphabet'] },
+  { symbol: 'GOOGL', name: 'Alphabet Inc. Class A', aliases: ['google class a', 'alphabet class a'] },
+  { symbol: 'META', name: 'Meta Platforms, Inc.', aliases: ['meta', 'facebook'] },
+  { symbol: 'NFLX', name: 'Netflix, Inc.', aliases: ['netflix'] },
+  { symbol: 'AMD', name: 'Advanced Micro Devices, Inc.', aliases: ['amd', 'advanced micro devices'] },
+  { symbol: 'INTC', name: 'Intel Corporation', aliases: ['intel'] },
+  { symbol: 'CSCO', name: 'Cisco Systems, Inc.', aliases: ['cisco'] },
+  { symbol: 'ADBE', name: 'Adobe Inc.', aliases: ['adobe'] },
+  { symbol: 'PYPL', name: 'PayPal Holdings, Inc.', aliases: ['paypal'] },
+  { symbol: 'COST', name: 'Costco Wholesale Corporation', aliases: ['costco'] },
+  { symbol: 'PEP', name: 'PepsiCo, Inc.', aliases: ['pepsico', 'pepsi'] },
+  { symbol: 'AVGO', name: 'Broadcom Inc.', aliases: ['broadcom'] },
+  { symbol: 'QCOM', name: 'QUALCOMM Incorporated', aliases: ['qualcomm'] },
+];
+
 const importantPostTemplates = [
   'Large discussion about {ticker} product roadmap and expected revenue growth over the next 2 quarters.',
   'Debate on whether {ticker} has reached fair value after the recent run-up in price.',
@@ -24,6 +45,8 @@ const importantPostTemplates = [
 const analysisSection = document.getElementById('analysisSection');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const stockInput = document.getElementById('stockInput');
+const stockSuggestions = document.getElementById('stockSuggestions');
+const searchFeedbackEl = document.getElementById('searchFeedback');
 const chartCanvas = document.getElementById('mentionsChart');
 const chartTitle = document.getElementById('chartTitle');
 const chartLegend = document.getElementById('chartLegend');
@@ -34,20 +57,41 @@ const importantPostsEl = document.getElementById('importantPosts');
 const investmentSummaryEl = document.getElementById('investmentSummary');
 const peMetricEl = document.getElementById('peMetric');
 const dividendMetricEl = document.getElementById('dividendMetric');
+const searchableNasdaqStocks = nasdaqStocks.map((stock) => ({
+  ...stock,
+  searchableTerms: [
+    stock.symbol,
+    stock.name,
+    ...(stock.aliases || []),
+  ].map(normalizeSearchKey),
+}));
 
+populateStockSuggestions();
 analyzeBtn.addEventListener('click', runAnalysis);
 stockInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     runAnalysis();
   }
 });
+stockInput.addEventListener('blur', () => {
+  const resolved = resolveNasdaqTicker(stockInput.value);
+  if (resolved) {
+    stockInput.value = resolved.symbol;
+    setSearchFeedback(`Using NASDAQ ticker ${resolved.symbol} (${resolved.name}).`, 'ok');
+  }
+});
 
 function runAnalysis() {
-  const ticker = stockInput.value.trim().toUpperCase();
-  if (!ticker) {
+  const resolved = resolveNasdaqTicker(stockInput.value);
+  if (!resolved) {
+    setSearchFeedback('Please enter a valid NASDAQ stock ticker or company name.', 'error');
     stockInput.focus();
     return;
   }
+
+  const ticker = resolved.symbol;
+  stockInput.value = ticker;
+  setSearchFeedback(`Using NASDAQ ticker ${ticker} (${resolved.name}).`, 'ok');
 
   const simulated = generateSocialDataset(ticker);
   renderGraph(simulated.dailyMentions);
@@ -58,6 +102,47 @@ function runAnalysis() {
 
   chartTitle.textContent = `${ticker} Social Mentions (Last 30 Days)`;
   analysisSection.classList.remove('hidden');
+}
+
+function populateStockSuggestions() {
+  stockSuggestions.innerHTML = '';
+  searchableNasdaqStocks.forEach((stock) => {
+    const option = document.createElement('option');
+    option.value = `${stock.symbol} — ${stock.name}`;
+    stockSuggestions.appendChild(option);
+  });
+}
+
+function normalizeSearchKey(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function resolveNasdaqTicker(inputValue) {
+  const normalizedInput = normalizeSearchKey(inputValue.trim());
+  if (!normalizedInput) {
+    return null;
+  }
+
+  const stockFromSymbol = searchableNasdaqStocks.find((stock) => normalizeSearchKey(stock.symbol) === normalizedInput);
+  if (stockFromSymbol) {
+    return stockFromSymbol;
+  }
+
+  const stockFromTerm = searchableNasdaqStocks.find((stock) => stock.searchableTerms.includes(normalizedInput));
+  if (stockFromTerm) {
+    return stockFromTerm;
+  }
+
+  const stockFromOption = searchableNasdaqStocks.find((stock) => {
+    const normalizedOption = normalizeSearchKey(`${stock.symbol}${stock.name}`);
+    return normalizedOption === normalizedInput;
+  });
+  return stockFromOption || null;
+}
+
+function setSearchFeedback(message, tone) {
+  searchFeedbackEl.textContent = message;
+  searchFeedbackEl.className = `search-feedback ${tone}`;
 }
 
 function generateSocialDataset(ticker) {
