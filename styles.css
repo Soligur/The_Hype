@@ -1,0 +1,179 @@
+:root {
+  --bg: #050505;
+  --card: #111215;
+  --text: #f5f5f5;
+  --muted: #b6b6b6;
+  --accent: #3b82f6;
+  --border: #2a2d34;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+main {
+  width: min(1100px, 95vw);
+  margin: 0 auto 2.5rem;
+}
+
+.site-header {
+  text-align: center;
+  padding: 2.5rem 1rem 1.2rem;
+}
+
+.site-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: 0.03em;
+}
+
+.subtitle {
+  color: var(--muted);
+  margin-top: 0.6rem;
+}
+
+.search-panel {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.search-panel label {
+  font-weight: 600;
+}
+
+.search-controls {
+  display: flex;
+  gap: 0.6rem;
+}
+
+input {
+  flex: 1;
+  background: #0a0b0e;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-size: 1rem;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.analysis {
+  display: grid;
+  gap: 1rem;
+}
+
+.hidden {
+  display: none;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+h2, h3 {
+  margin-top: 0;
+}
+
+canvas {
+  width: 100%;
+  height: auto;
+  border: 1px solid #202227;
+  border-radius: 10px;
+  background: #0b0d11;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.swatch {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.sentiment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  gap: 0.5rem;
+}
+
+.sentiment-count {
+  font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+  font-weight: 700;
+  margin: 0;
+}
+
+.posts {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.posts li::marker {
+  color: var(--accent);
+}
+
+.summary {
+  line-height: 1.6;
+  margin-top: 0;
+}
+
+.metrics {
+  display: flex;
+  gap: 1rem;
+  color: #d8d8d8;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .search-controls {
+    flex-direction: column;
+  }
+
+  .sentiment-grid {
+    grid-template-columns: 1fr;
+  }
+}
