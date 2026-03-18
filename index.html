@@ -16,9 +16,11 @@
       <section class="search-panel">
         <label for="stockInput">Choose a stock ticker</label>
         <div class="search-controls">
-          <input id="stockInput" type="text" placeholder="e.g., AAPL, TSLA, NVDA" maxlength="8" />
+          <input id="stockInput" type="text" placeholder="e.g., AAPL, TSLA, NVDA, Google" maxlength="40" list="stockSuggestions" />
+          <datalist id="stockSuggestions"></datalist>
           <button id="analyzeBtn">Analyze 30 Days</button>
         </div>
+        <p id="searchFeedback" class="search-feedback" aria-live="polite"></p>
         <p class="hint">Demo mode uses simulated social data and sample valuation metrics.</p>
       </section>
 
