@@ -57,32 +57,33 @@ const importantPostsEl = document.getElementById('importantPosts');
 const investmentSummaryEl = document.getElementById('investmentSummary');
 const peMetricEl = document.getElementById('peMetric');
 const dividendMetricEl = document.getElementById('dividendMetric');
-const searchableNasdaqStocks = nasdaqStocks.map((stock) => ({
+
+const fallbackSearchableNasdaqStocks = nasdaqStocks.map((stock) => ({
   ...stock,
-  searchableTerms: [
-    stock.symbol,
-    stock.name,
-    ...(stock.aliases || []),
-  ].map(normalizeSearchKey),
+  searchableTerms: [stock.symbol, stock.name, ...(stock.aliases || [])].map(normalizeSearchKey),
 }));
 
-populateStockSuggestions();
+let latestApiResults = [];
+let nextApiRetryAt = 0;
+
+populateStockSuggestions(fallbackSearchableNasdaqStocks);
 analyzeBtn.addEventListener('click', runAnalysis);
 stockInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     runAnalysis();
   }
 });
-stockInput.addEventListener('blur', () => {
-  const resolved = resolveNasdaqTicker(stockInput.value);
+stockInput.addEventListener('input', debounce(refreshSuggestionsFromApi, 180));
+stockInput.addEventListener('blur', async () => {
+  const resolved = await resolveNasdaqTicker(stockInput.value);
   if (resolved) {
     stockInput.value = resolved.symbol;
     setSearchFeedback(`Using NASDAQ ticker ${resolved.symbol} (${resolved.name}).`, 'ok');
   }
 });
 
-function runAnalysis() {
-  const resolved = resolveNasdaqTicker(stockInput.value);
+async function runAnalysis() {
+  const resolved = await resolveNasdaqTicker(stockInput.value);
   if (!resolved) {
     setSearchFeedback('Please enter a valid NASDAQ stock ticker or company name.', 'error');
     stockInput.focus();
@@ -104,9 +105,9 @@ function runAnalysis() {
   analysisSection.classList.remove('hidden');
 }
 
-function populateStockSuggestions() {
+function populateStockSuggestions(stocks) {
   stockSuggestions.innerHTML = '';
-  searchableNasdaqStocks.forEach((stock) => {
+  stocks.forEach((stock) => {
     const option = document.createElement('option');
     option.value = `${stock.symbol} — ${stock.name}`;
     stockSuggestions.appendChild(option);
@@ -114,30 +115,97 @@ function populateStockSuggestions() {
 }
 
 function normalizeSearchKey(value) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function resolveNasdaqTicker(inputValue) {
+function resolveFromCollection(collection, inputValue) {
   const normalizedInput = normalizeSearchKey(inputValue.trim());
   if (!normalizedInput) {
     return null;
   }
 
-  const stockFromSymbol = searchableNasdaqStocks.find((stock) => normalizeSearchKey(stock.symbol) === normalizedInput);
+  const stockFromSymbol = collection.find((stock) => normalizeSearchKey(stock.symbol) === normalizedInput);
   if (stockFromSymbol) {
     return stockFromSymbol;
   }
 
-  const stockFromTerm = searchableNasdaqStocks.find((stock) => stock.searchableTerms.includes(normalizedInput));
+  const stockFromTerm = collection.find((stock) => {
+    const terms = stock.searchableTerms || [stock.symbol, stock.name, ...(stock.aliases || [])].map(normalizeSearchKey);
+    return terms.includes(normalizedInput);
+  });
   if (stockFromTerm) {
     return stockFromTerm;
   }
 
-  const stockFromOption = searchableNasdaqStocks.find((stock) => {
-    const normalizedOption = normalizeSearchKey(`${stock.symbol}${stock.name}`);
-    return normalizedOption === normalizedInput;
+  return collection.find((stock) => normalizeSearchKey(`${stock.symbol}${stock.name}`) === normalizedInput) || null;
+}
+
+async function resolveNasdaqTicker(inputValue) {
+  const normalizedInput = normalizeSearchKey(inputValue.trim());
+  if (!normalizedInput) {
+    return null;
+  }
+
+  const apiMatches = await fetchStockSearch(inputValue);
+  const resolvedFromApi = resolveFromCollection(apiMatches, inputValue);
+  if (resolvedFromApi) {
+    return resolvedFromApi;
+  }
+
+  return resolveFromCollection(fallbackSearchableNasdaqStocks, inputValue);
+}
+
+async function refreshSuggestionsFromApi() {
+  const query = stockInput.value.trim();
+  if (!query) {
+    populateStockSuggestions(fallbackSearchableNasdaqStocks);
+    return;
+  }
+
+  const apiMatches = await fetchStockSearch(query);
+  if (apiMatches.length) {
+    populateStockSuggestions(apiMatches);
+    return;
+  }
+
+  const fallbackMatches = fallbackSearchableNasdaqStocks.filter((stock) => {
+    const q = normalizeSearchKey(query);
+    return stock.searchableTerms.some((term) => term.includes(q));
   });
-  return stockFromOption || null;
+  populateStockSuggestions(fallbackMatches.length ? fallbackMatches : fallbackSearchableNasdaqStocks);
+}
+
+async function fetchStockSearch(query) {
+  if (Date.now() < nextApiRetryAt) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`/api/stocks/search?q=${encodeURIComponent(query)}&limit=20`);
+    if (!response.ok) {
+      throw new Error(`Search API failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    nextApiRetryAt = 0;
+    latestApiResults = (payload.results || []).map((stock) => ({
+      ...stock,
+      searchableTerms: [stock.symbol, stock.name, ...(stock.aliases || [])].map(normalizeSearchKey),
+    }));
+    return latestApiResults;
+  } catch (error) {
+    nextApiRetryAt = Date.now() + 30_000;
+    console.warn('[stocks search] API unavailable, using fallback resolver:', error.message);
+    return [];
+  }
+}
+
+function debounce(fn, delayMs) {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delayMs);
+  };
 }
 
 function setSearchFeedback(message, tone) {
