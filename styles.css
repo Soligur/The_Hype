@@ -98,6 +98,26 @@ button {
   color: #ff7b72;
 }
 
+.search-feedback.warning {
+  color: #f2cc60;
+}
+
+.source-verification {
+  margin: 0;
+  min-height: 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.source-verification.ok {
+  color: #7ee787;
+}
+
+.source-verification.warning {
+  color: #f2cc60;
+}
+
 .analysis {
   display: grid;
   gap: 1rem;

@@ -57,11 +57,13 @@ const server = http.createServer((req, res) => {
     const q = (url.searchParams.get('q') || '').trim();
     const limit = Number(url.searchParams.get('limit') || 20);
     const results = symbolService.search(q, Number.isFinite(limit) ? Math.min(limit, 50) : 20);
+    const matchedSymbol = results[0]?.symbol || null;
+    const meta = symbolService.getMeta(matchedSymbol);
 
     writeJson(res, 200, {
       query: q,
       results,
-      meta: symbolService.getMeta(),
+      meta,
     });
     return;
   }
