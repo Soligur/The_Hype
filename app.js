@@ -47,6 +47,7 @@ const analyzeBtn = document.getElementById('analyzeBtn');
 const stockInput = document.getElementById('stockInput');
 const stockSuggestions = document.getElementById('stockSuggestions');
 const searchFeedbackEl = document.getElementById('searchFeedback');
+const sourceVerificationEl = document.getElementById('sourceVerification');
 const chartCanvas = document.getElementById('mentionsChart');
 const chartTitle = document.getElementById('chartTitle');
 const chartLegend = document.getElementById('chartLegend');
@@ -64,9 +65,11 @@ const fallbackSearchableNasdaqStocks = nasdaqStocks.map((stock) => ({
 }));
 
 let latestApiResults = [];
+let latestSearchMeta = null;
 let nextApiRetryAt = 0;
 
 populateStockSuggestions(fallbackSearchableNasdaqStocks);
+setSourceVerificationStatus(false);
 analyzeBtn.addEventListener('click', runAnalysis);
 stockInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
@@ -78,7 +81,8 @@ stockInput.addEventListener('blur', async () => {
   const resolved = await resolveNasdaqTicker(stockInput.value);
   if (resolved) {
     stockInput.value = resolved.symbol;
-    setSearchFeedback(`Using NASDAQ ticker ${resolved.symbol} (${resolved.name}).`, 'ok');
+    setSearchFeedback(`Using NASDAQ ticker ${resolved.symbol} (${resolved.name}).`, resolved.isLiveVerified ? 'ok' : 'warning');
+    setSourceVerificationStatus(resolved.isLiveVerified);
   }
 });
 
@@ -92,6 +96,14 @@ async function runAnalysis() {
 
   const ticker = resolved.symbol;
   stockInput.value = ticker;
+  setSourceVerificationStatus(resolved.isLiveVerified);
+
+  if (!resolved.isLiveVerified) {
+    setSearchFeedback(`"${ticker}" is only available from fallback cache. Live NASDAQ verification is required before analysis.`, 'warning');
+    analysisSection.classList.add('hidden');
+    return;
+  }
+
   setSearchFeedback(`Using NASDAQ ticker ${ticker} (${resolved.name}).`, 'ok');
 
   const simulated = generateSocialDataset(ticker);
@@ -152,7 +164,16 @@ async function resolveNasdaqTicker(inputValue) {
     return resolvedFromApi;
   }
 
-  return resolveFromCollection(fallbackSearchableNasdaqStocks, inputValue);
+  const resolvedFromFallback = resolveFromCollection(fallbackSearchableNasdaqStocks, inputValue);
+  if (!resolvedFromFallback) {
+    return null;
+  }
+
+  return {
+    ...resolvedFromFallback,
+    isLiveVerified: false,
+    verificationSource: 'fallback',
+  };
 }
 
 async function refreshSuggestionsFromApi() {
@@ -177,6 +198,7 @@ async function refreshSuggestionsFromApi() {
 
 async function fetchStockSearch(query) {
   if (Date.now() < nextApiRetryAt) {
+    latestSearchMeta = null;
     return [];
   }
 
@@ -188,13 +210,19 @@ async function fetchStockSearch(query) {
 
     const payload = await response.json();
     nextApiRetryAt = 0;
+    latestSearchMeta = payload.meta || null;
     latestApiResults = (payload.results || []).map((stock) => ({
       ...stock,
+      isLiveVerified: Boolean(stock.isLiveVerified),
+      verificationSource: stock.verificationSource || (stock.isLiveVerified ? 'live' : 'fallback'),
       searchableTerms: [stock.symbol, stock.name, ...(stock.aliases || [])].map(normalizeSearchKey),
     }));
+    setSourceVerificationStatus(latestSearchMeta?.verification?.mode === 'live');
     return latestApiResults;
   } catch (error) {
     nextApiRetryAt = Date.now() + 30_000;
+    latestSearchMeta = null;
+    setSourceVerificationStatus(false);
     console.warn('[stocks search] API unavailable, using fallback resolver:', error.message);
     return [];
   }
@@ -211,6 +239,15 @@ function debounce(fn, delayMs) {
 function setSearchFeedback(message, tone) {
   searchFeedbackEl.textContent = message;
   searchFeedbackEl.className = `search-feedback ${tone}`;
+}
+
+function setSourceVerificationStatus(isLiveVerified) {
+  if (!sourceVerificationEl) {
+    return;
+  }
+
+  sourceVerificationEl.textContent = isLiveVerified ? 'Live verified NASDAQ source' : 'Fallback mode';
+  sourceVerificationEl.className = `source-verification ${isLiveVerified ? 'ok' : 'warning'}`;
 }
 
 function generateSocialDataset(ticker) {

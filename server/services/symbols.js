@@ -201,15 +201,28 @@ class SymbolService {
         symbol: entry.symbol,
         name: entry.name,
         aliases: entry.aliases || [],
+        isLiveVerified: this.cache.source === NASDAQ_LISTING_URL,
+        verificationSource: this.cache.source === NASDAQ_LISTING_URL ? 'live' : 'fallback',
       }));
   }
 
-  getMeta() {
+  getMeta(symbol = null) {
+    const normalizedSymbol = normalizeSearchKey(symbol || '');
+    const symbolExistsInCache = normalizedSymbol
+      ? this.cache.symbols.some((entry) => entry.normalizedSymbol === normalizedSymbol)
+      : null;
+    const isLiveSource = this.cache.source === NASDAQ_LISTING_URL;
+
     return {
       source: this.cache.source,
       refreshedAt: this.cache.refreshedAt,
       refreshError: this.cache.refreshError,
       symbolCount: this.cache.symbols.length,
+      verification: {
+        symbol: symbol || null,
+        isLiveVerified: isLiveSource && (symbolExistsInCache ?? true),
+        mode: isLiveSource ? 'live' : 'fallback',
+      },
     };
   }
 }
