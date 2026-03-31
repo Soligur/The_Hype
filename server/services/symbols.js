@@ -1,26 +1,7 @@
 const NASDAQ_LISTING_URL = 'https://www.nasdaqtrader.com/dynamic/symdir/nasdaqlisted.txt';
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
-const fallbackSymbols = [
-  { symbol: 'AAPL', name: 'Apple Inc.', aliases: ['apple'] },
-  { symbol: 'TSLA', name: 'Tesla, Inc.', aliases: ['tesla'] },
-  { symbol: 'NVDA', name: 'NVIDIA Corporation', aliases: ['nvidia'] },
-  { symbol: 'MSFT', name: 'Microsoft Corporation', aliases: ['microsoft'] },
-  { symbol: 'AMZN', name: 'Amazon.com, Inc.', aliases: ['amazon'] },
-  { symbol: 'GOOG', name: 'Alphabet Inc. Class C', aliases: ['google', 'alphabet'] },
-  { symbol: 'GOOGL', name: 'Alphabet Inc. Class A', aliases: ['google class a', 'alphabet class a'] },
-  { symbol: 'META', name: 'Meta Platforms, Inc.', aliases: ['meta', 'facebook'] },
-  { symbol: 'NFLX', name: 'Netflix, Inc.', aliases: ['netflix'] },
-  { symbol: 'AMD', name: 'Advanced Micro Devices, Inc.', aliases: ['amd', 'advanced micro devices'] },
-  { symbol: 'INTC', name: 'Intel Corporation', aliases: ['intel'] },
-  { symbol: 'CSCO', name: 'Cisco Systems, Inc.', aliases: ['cisco'] },
-  { symbol: 'ADBE', name: 'Adobe Inc.', aliases: ['adobe'] },
-  { symbol: 'PYPL', name: 'PayPal Holdings, Inc.', aliases: ['paypal'] },
-  { symbol: 'COST', name: 'Costco Wholesale Corporation', aliases: ['costco'] },
-  { symbol: 'PEP', name: 'PepsiCo, Inc.', aliases: ['pepsico', 'pepsi'] },
-  { symbol: 'AVGO', name: 'Broadcom Inc.', aliases: ['broadcom'] },
-  { symbol: 'QCOM', name: 'QUALCOMM Incorporated', aliases: ['qualcomm'] },
-];
+const fs = require('fs');
+const path = require('path');
 
 function normalizeSearchKey(value = '') {
   return String(value).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -97,6 +78,16 @@ function parseListingFile(rawText) {
   return records;
 }
 
+function parseLocalFallbackListing() {
+  try {
+    const localPath = path.resolve(__dirname, '../../all_nasdaq_stock.txt');
+    const rawText = fs.readFileSync(localPath, 'utf8');
+    return parseListingFile(rawText);
+  } catch (error) {
+    return [];
+  }
+}
+
 function computeScore(entry, query) {
   const q = normalizeSearchKey(query);
   if (!q) {
@@ -124,16 +115,11 @@ function computeScore(entry, query) {
 class SymbolService {
   constructor(refreshIntervalMs = DAY_IN_MS) {
     this.refreshIntervalMs = refreshIntervalMs;
+    const localFallbackSymbols = parseLocalFallbackListing();
     this.cache = {
-      symbols: fallbackSymbols.map((record) => ({
-        ...record,
-        isEtf: false,
-        normalizedSymbol: normalizeSearchKey(record.symbol),
-        normalizedName: normalizeSearchKey(record.name),
-        normalizedAliases: (record.aliases || []).map(normalizeSearchKey),
-      })),
+      symbols: localFallbackSymbols,
       refreshedAt: null,
-      source: 'fallback',
+      source: localFallbackSymbols.length ? 'local-fallback' : 'fallback',
       refreshError: null,
     };
     this.refreshTimer = null;
