@@ -67,6 +67,8 @@ const fallbackSearchableNasdaqStocks = nasdaqStocks.map((stock) => ({
 let latestApiResults = [];
 let latestSearchMeta = null;
 let nextApiRetryAt = 0;
+const stockApiBase = resolveStockApiBase();
+const isGitHubPagesHost = window.location.hostname.endsWith('github.io');
 
 populateStockSuggestions(fallbackSearchableNasdaqStocks);
 setSourceVerificationStatus(false);
@@ -99,12 +101,13 @@ async function runAnalysis() {
   setSourceVerificationStatus(resolved.isLiveVerified);
 
   if (!resolved.isLiveVerified) {
-    setSearchFeedback(`"${ticker}" is only available from fallback cache. Live NASDAQ verification is required before analysis.`, 'warning');
-    analysisSection.classList.add('hidden');
-    return;
+    const warningMessage = isGitHubPagesHost
+      ? `Using fallback NASDAQ cache for "${ticker}" on GitHub Pages (live verification API is optional).`
+      : `Using fallback NASDAQ cache for "${ticker}" because live verification is unavailable right now.`;
+    setSearchFeedback(warningMessage, 'warning');
+  } else {
+    setSearchFeedback(`Using NASDAQ ticker ${ticker} (${resolved.name}).`, 'ok');
   }
-
-  setSearchFeedback(`Using NASDAQ ticker ${ticker} (${resolved.name}).`, 'ok');
 
   const simulated = generateSocialDataset(ticker);
   renderGraph(simulated.dailyMentions);
@@ -203,7 +206,7 @@ async function fetchStockSearch(query) {
   }
 
   try {
-    const response = await fetch(`/api/stocks/search?q=${encodeURIComponent(query)}&limit=20`);
+    const response = await fetch(buildStockSearchUrl(query));
     if (!response.ok) {
       throw new Error(`Search API failed with status ${response.status}`);
     }
@@ -246,8 +249,32 @@ function setSourceVerificationStatus(isLiveVerified) {
     return;
   }
 
-  sourceVerificationEl.textContent = isLiveVerified ? 'Live verified NASDAQ source' : 'Fallback mode';
+  sourceVerificationEl.textContent = isLiveVerified
+    ? 'Live verified NASDAQ source'
+    : (isGitHubPagesHost ? 'Fallback mode (GitHub Pages static host)' : 'Fallback mode');
   sourceVerificationEl.className = `source-verification ${isLiveVerified ? 'ok' : 'warning'}`;
+}
+
+function resolveStockApiBase() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  if (typeof window.THE_HYPE_API_BASE === 'string' && window.THE_HYPE_API_BASE.trim()) {
+    return window.THE_HYPE_API_BASE.trim().replace(/\/+$/, '');
+  }
+
+  const configuredBase = document
+    .querySelector('meta[name="the-hype-api-base"]')
+    ?.getAttribute('content')
+    ?.trim();
+
+  return configuredBase ? configuredBase.replace(/\/+$/, '') : '';
+}
+
+function buildStockSearchUrl(query) {
+  const path = `/api/stocks/search?q=${encodeURIComponent(query)}&limit=20`;
+  return stockApiBase ? `${stockApiBase}${path}` : path;
 }
 
 function generateSocialDataset(ticker) {
