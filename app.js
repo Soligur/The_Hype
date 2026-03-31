@@ -122,7 +122,8 @@ function populateStockSuggestions(stocks) {
   stockSuggestions.innerHTML = '';
   stocks.forEach((stock) => {
     const option = document.createElement('option');
-    option.value = `${stock.symbol} — ${stock.name}`;
+    option.value = stock.symbol;
+    option.label = stock.name;
     stockSuggestions.appendChild(option);
   });
 }
@@ -320,8 +321,14 @@ function debounce(fn, delayMs) {
 }
 
 function setSearchFeedback(message, tone) {
+  if (tone !== 'error') {
+    searchFeedbackEl.textContent = '';
+    searchFeedbackEl.className = 'search-feedback';
+    return;
+  }
+
   searchFeedbackEl.textContent = message;
-  searchFeedbackEl.className = `search-feedback ${tone}`;
+  searchFeedbackEl.className = 'search-feedback error';
 }
 
 function setSourceVerificationStatus(isLiveVerified) {
