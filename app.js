@@ -13,7 +13,7 @@ const sampleValuation = {
   AMZN: { pe: 50.8, dividend: 0.0 },
 };
 
-const nasdaqStocks = [
+const staticNasdaqStocks = [
   { symbol: 'AAPL', name: 'Apple Inc.', aliases: ['apple'] },
   { symbol: 'TSLA', name: 'Tesla, Inc.', aliases: ['tesla'] },
   { symbol: 'NVDA', name: 'NVIDIA Corporation', aliases: ['nvidia'] },
@@ -59,10 +59,7 @@ const investmentSummaryEl = document.getElementById('investmentSummary');
 const peMetricEl = document.getElementById('peMetric');
 const dividendMetricEl = document.getElementById('dividendMetric');
 
-const fallbackSearchableNasdaqStocks = nasdaqStocks.map((stock) => ({
-  ...stock,
-  searchableTerms: [stock.symbol, stock.name, ...(stock.aliases || [])].map(normalizeSearchKey),
-}));
+let fallbackSearchableNasdaqStocks = buildSearchableStocks(staticNasdaqStocks);
 
 let latestApiResults = [];
 let latestSearchMeta = null;
@@ -71,6 +68,7 @@ const stockApiBase = resolveStockApiBase();
 const isGitHubPagesHost = window.location.hostname.endsWith('github.io');
 
 populateStockSuggestions(fallbackSearchableNasdaqStocks);
+initializeFallbackStocks();
 setSourceVerificationStatus(false);
 analyzeBtn.addEventListener('click', runAnalysis);
 stockInput.addEventListener('keydown', (event) => {
@@ -127,6 +125,88 @@ function populateStockSuggestions(stocks) {
     option.value = `${stock.symbol} — ${stock.name}`;
     stockSuggestions.appendChild(option);
   });
+}
+
+function buildSearchableStocks(stocks) {
+  return stocks.map((stock) => ({
+    ...stock,
+    searchableTerms: [stock.symbol, stock.name, ...(stock.aliases || [])].map(normalizeSearchKey),
+  }));
+}
+
+async function initializeFallbackStocks() {
+  const listingStocks = await loadFallbackStocksFromTxt();
+  if (!listingStocks.length) {
+    return;
+  }
+
+  fallbackSearchableNasdaqStocks = buildSearchableStocks(listingStocks);
+  populateStockSuggestions(fallbackSearchableNasdaqStocks);
+}
+
+function buildAliasesFromSecurityName(name) {
+  const cleanedName = String(name || '').trim();
+  if (!cleanedName) {
+    return [];
+  }
+
+  const baseName = cleanedName.split(' - ')[0].trim();
+  const normalizedBaseName = baseName
+    .replace(/\b(inc\.?|corp\.?|corporation|holdings|class\s+[a-z]|common stock|ordinary shares?|limited|ltd\.?|plc|ads|etf)\b/gi, ' ')
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  return Array.from(new Set([baseName.toLowerCase(), normalizedBaseName].filter(Boolean)));
+}
+
+function parseNasdaqListingText(rawText) {
+  const lines = String(rawText || '').trim().split(/\r?\n/);
+  const header = lines[0]?.split('|') || [];
+  const symbolIndex = header.indexOf('Symbol');
+  const nameIndex = header.indexOf('Security Name');
+
+  if (symbolIndex === -1 || nameIndex === -1) {
+    return [];
+  }
+
+  const stocks = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!line || line.startsWith('File Creation Time')) {
+      continue;
+    }
+
+    const parts = line.split('|');
+    const symbol = (parts[symbolIndex] || '').trim();
+    const name = (parts[nameIndex] || '').trim();
+    if (!symbol || !name) {
+      continue;
+    }
+
+    stocks.push({
+      symbol,
+      name,
+      aliases: buildAliasesFromSecurityName(name),
+    });
+  }
+  return stocks;
+}
+
+async function loadFallbackStocksFromTxt() {
+  try {
+    const response = await fetch('all_nasdaq_stock.txt', { cache: 'no-store' });
+    if (!response.ok) {
+      return [];
+    }
+
+    const rawText = await response.text();
+    return parseNasdaqListingText(rawText);
+  } catch (error) {
+    console.warn('[stocks search] unable to load local NASDAQ listing file:', error.message);
+    return [];
+  }
 }
 
 function normalizeSearchKey(value) {
