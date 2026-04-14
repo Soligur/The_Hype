@@ -130,6 +130,9 @@ class SymbolService {
     this.refreshTimer = setInterval(() => {
       this.refreshNow();
     }, this.refreshIntervalMs);
+    if (typeof this.refreshTimer.unref === 'function') {
+      this.refreshTimer.unref();
+    }
   }
 
   async refreshNow() {

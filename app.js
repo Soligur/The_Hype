@@ -58,10 +58,10 @@ const importantPostsEl = document.getElementById('importantPosts');
 const investmentSummaryEl = document.getElementById('investmentSummary');
 const peMetricEl = document.getElementById('peMetric');
 const dividendMetricEl = document.getElementById('dividendMetric');
+let fakeCommentsByTicker = {};
 
 let fallbackSearchableNasdaqStocks = buildSearchableStocks(staticNasdaqStocks);
 
-let latestApiResults = [];
 let latestSearchMeta = null;
 let nextApiRetryAt = 0;
 const stockApiBase = resolveStockApiBase();
@@ -69,6 +69,7 @@ const isGitHubPagesHost = window.location.hostname.endsWith('github.io');
 
 populateStockSuggestions(fallbackSearchableNasdaqStocks);
 initializeFallbackStocks();
+loadFakeComments();
 setSourceVerificationStatus(false);
 analyzeBtn.addEventListener('click', runAnalysis);
 stockInput.addEventListener('keydown', (event) => {
@@ -108,11 +109,16 @@ async function runAnalysis() {
   }
 
   const simulated = generateSocialDataset(ticker);
+  const comments = getFakeCommentsForTicker(ticker);
+  const positive = comments.positive.length || simulated.positive;
+  const negative = comments.negative.length || simulated.negative;
+  const sentimentScore = Math.round((positive / (positive + negative)) * 100);
+
   renderGraph(simulated.dailyMentions);
   renderLegend();
-  renderSentiment(simulated.positive, simulated.negative);
-  renderImportantPosts(ticker);
-  renderInvestmentSummary(ticker, simulated.trendStrength, simulated.sentimentScore);
+  renderSentiment(positive, negative);
+  renderImportantPosts(ticker, comments);
+  renderInvestmentSummary(ticker, simulated.trendStrength, sentimentScore);
 
   chartTitle.textContent = `${ticker} Social Mentions (Last 30 Days)`;
   analysisSection.classList.remove('hidden');
@@ -143,6 +149,32 @@ async function initializeFallbackStocks() {
 
   fallbackSearchableNasdaqStocks = buildSearchableStocks(listingStocks);
   populateStockSuggestions(fallbackSearchableNasdaqStocks);
+}
+
+async function loadFakeComments() {
+  try {
+    const response = await fetch('data/fake_comments.json', { cache: 'no-store' });
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = await response.json();
+    fakeCommentsByTicker = payload && typeof payload === 'object' ? payload : {};
+  } catch (error) {
+    console.warn('[fake comments] unable to load local fake comments:', error.message);
+  }
+}
+
+function getFakeCommentsForTicker(ticker) {
+  const comments = fakeCommentsByTicker[ticker];
+  if (!comments) {
+    return { positive: [], negative: [] };
+  }
+
+  return {
+    positive: Array.isArray(comments.positive) ? comments.positive : [],
+    negative: Array.isArray(comments.negative) ? comments.negative : [],
+  };
 }
 
 function buildAliasesFromSecurityName(name) {
@@ -295,14 +327,14 @@ async function fetchStockSearch(query) {
     const payload = await response.json();
     nextApiRetryAt = 0;
     latestSearchMeta = payload.meta || null;
-    latestApiResults = (payload.results || []).map((stock) => ({
+    const apiResults = (payload.results || []).map((stock) => ({
       ...stock,
       isLiveVerified: Boolean(stock.isLiveVerified),
       verificationSource: stock.verificationSource || (stock.isLiveVerified ? 'live' : 'fallback'),
       searchableTerms: [stock.symbol, stock.name, ...(stock.aliases || [])].map(normalizeSearchKey),
     }));
     setSourceVerificationStatus(latestSearchMeta?.verification?.mode === 'live');
-    return latestApiResults;
+    return apiResults;
   } catch (error) {
     nextApiRetryAt = Date.now() + 30_000;
     latestSearchMeta = null;
@@ -321,14 +353,8 @@ function debounce(fn, delayMs) {
 }
 
 function setSearchFeedback(message, tone) {
-  if (tone !== 'error') {
-    searchFeedbackEl.textContent = '';
-    searchFeedbackEl.className = 'search-feedback';
-    return;
-  }
-
   searchFeedbackEl.textContent = message;
-  searchFeedbackEl.className = 'search-feedback error';
+  searchFeedbackEl.className = `search-feedback ${tone || ''}`.trim();
 }
 
 function setSourceVerificationStatus(isLiveVerified) {
@@ -476,12 +502,30 @@ function renderSentiment(positive, negative) {
   sentimentScoreEl.textContent = `${score}%`;
 }
 
-function renderImportantPosts(ticker) {
+function renderImportantPosts(ticker, comments) {
   importantPostsEl.innerHTML = '';
 
-  importantPostTemplates.slice(0, 4).forEach((template) => {
+  const hasFakeComments = comments.positive.length || comments.negative.length;
+  if (!hasFakeComments) {
+    importantPostTemplates.slice(0, 4).forEach((template) => {
+      const li = document.createElement('li');
+      li.textContent = template.replace('{ticker}', ticker);
+      importantPostsEl.appendChild(li);
+    });
+    return;
+  }
+
+  comments.positive.forEach((comment) => {
     const li = document.createElement('li');
-    li.textContent = template.replace('{ticker}', ticker);
+    li.className = 'post-positive';
+    li.textContent = comment;
+    importantPostsEl.appendChild(li);
+  });
+
+  comments.negative.forEach((comment) => {
+    const li = document.createElement('li');
+    li.className = 'post-negative';
+    li.textContent = comment;
     importantPostsEl.appendChild(li);
   });
 }

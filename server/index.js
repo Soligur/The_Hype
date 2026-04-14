@@ -68,14 +68,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/stocks/health' && req.method === 'GET') {
-    writeJson(res, 200, {
-      status: 'ok',
-      symbols: symbolService.getMeta(),
-    });
-    return;
-  }
-
   serveStatic(url.pathname, res);
 });
 
