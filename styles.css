@@ -190,6 +190,14 @@ canvas {
   color: var(--accent);
 }
 
+.posts li.post-positive::marker {
+  color: #7ee787;
+}
+
+.posts li.post-negative::marker {
+  color: #ff7b72;
+}
+
 .summary {
   line-height: 1.6;
   margin-top: 0;
