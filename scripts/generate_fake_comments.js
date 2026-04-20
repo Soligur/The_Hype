@@ -7,14 +7,6 @@ const ROOT = path.resolve(__dirname, '..');
 const NASDAQ_FILE = path.join(ROOT, 'all_nasdaq_stock.txt');
 const OUTPUT_FILE = path.join(ROOT, 'data', 'fake_comments.json');
 
-const POPULAR_TICKER_PRIORITY = [
-  'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'AMD', 'INTC', 'NFLX',
-  'ADBE', 'CSCO', 'PEP', 'COST', 'AVGO', 'QCOM', 'TXN', 'INTU', 'AMAT', 'PYPL',
-  'SBUX', 'BKNG', 'ISRG', 'GILD', 'CMCSA', 'AMGN', 'ADI', 'MU', 'LRCX', 'PANW',
-  'CRWD', 'ADP', 'MDLZ', 'VRTX', 'REGN', 'MELI', 'MAR', 'CDNS', 'SNPS', 'KLAC',
-  'ASML', 'TEAM', 'ABNB', 'SHOP', 'ROST', 'ORLY', 'FTNT', 'DDOG', 'ZS', 'OKTA'
-];
-
 const POSITIVE_TEMPLATES = [
   'Totally-real-human take: {symbol} ({company}) is moonwalking into my pretend portfolio.',
   'Not financial advice, but my imaginary analyst says {symbol} looks wildly strong this quarter.',
@@ -117,45 +109,20 @@ function parseNasdaqList(rawText) {
   return records;
 }
 
-function selectPopularTickers(records, desiredCount) {
-  const bySymbol = new Map(records.map((record) => [record.symbol, record]));
-  const selected = [];
-
-  for (const symbol of POPULAR_TICKER_PRIORITY) {
-    const record = bySymbol.get(symbol);
-    if (record) {
-      selected.push(record);
-    }
-    if (selected.length === desiredCount) {
-      return selected;
-    }
-  }
-
-  for (const record of records) {
-    if (selected.length === desiredCount) {
-      break;
-    }
-
-    if (selected.some((item) => item.symbol === record.symbol)) {
-      continue;
-    }
-
-    const looksLikeCommonStock = /common stock|ordinary shares|class [ab] common stock/i.test(record.company);
-    if (looksLikeCommonStock) {
-      selected.push(record);
-    }
-  }
-
-  return selected.slice(0, desiredCount);
+function randomCount(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function buildFakeComments(records) {
   const output = {};
 
   for (const { symbol, company } of records) {
+    const positiveCount = randomCount(1, 10);
+    const negativeCount = randomCount(1, 10);
+
     output[symbol] = {
-      positive: pickTemplatedComments(POSITIVE_TEMPLATES, symbol, company, 10, 'positive'),
-      negative: pickTemplatedComments(NEGATIVE_TEMPLATES, symbol, company, 10, 'negative')
+      positive: pickTemplatedComments(POSITIVE_TEMPLATES, symbol, company, positiveCount, 'positive'),
+      negative: pickTemplatedComments(NEGATIVE_TEMPLATES, symbol, company, negativeCount, 'negative')
     };
   }
 
@@ -165,18 +132,12 @@ function buildFakeComments(records) {
 function main() {
   const rawText = fs.readFileSync(NASDAQ_FILE, 'utf8');
   const records = parseNasdaqList(rawText);
-  const selectedTickers = selectPopularTickers(records, 50);
-
-  if (selectedTickers.length < 50) {
-    throw new Error(`Expected 50 tickers, found only ${selectedTickers.length}.`);
-  }
-
-  const fakeComments = buildFakeComments(selectedTickers);
+  const fakeComments = buildFakeComments(records);
 
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
   fs.writeFileSync(OUTPUT_FILE, `${JSON.stringify(fakeComments, null, 2)}\n`, 'utf8');
 
-  console.log(`Generated fake comments for ${selectedTickers.length} tickers at ${path.relative(ROOT, OUTPUT_FILE)}.`);
+  console.log(`Generated fake comments for ${records.length} tickers at ${path.relative(ROOT, OUTPUT_FILE)}.`);
 }
 
 main();
