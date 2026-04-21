@@ -99,14 +99,7 @@ async function runAnalysis() {
   stockInput.value = ticker;
   setSourceVerificationStatus(resolved.isLiveVerified);
 
-  if (!resolved.isLiveVerified) {
-    const warningMessage = isGitHubPagesHost
-      ? `Using fallback NASDAQ cache for "${ticker}" on GitHub Pages (live verification API is optional).`
-      : `Using fallback NASDAQ cache for "${ticker}" because live verification is unavailable right now.`;
-    setSearchFeedback(warningMessage, 'warning');
-  } else {
-    setSearchFeedback(`Using NASDAQ ticker ${ticker} (${resolved.name}).`, 'ok');
-  }
+  setSearchFeedback(`Using NASDAQ ticker ${ticker} (${resolved.name}).`, 'ok');
 
   const simulated = generateSocialDataset(ticker);
   const comments = getFakeCommentsForTicker(ticker);
@@ -364,8 +357,8 @@ function setSourceVerificationStatus(isLiveVerified) {
 
   sourceVerificationEl.textContent = isLiveVerified
     ? 'Live verified NASDAQ source'
-    : (isGitHubPagesHost ? 'Fallback mode (GitHub Pages static host)' : 'Fallback mode');
-  sourceVerificationEl.className = `source-verification ${isLiveVerified ? 'ok' : 'warning'}`;
+    : 'NASDAQ source available';
+  sourceVerificationEl.className = `source-verification ${isLiveVerified ? 'ok' : ''}`.trim();
 }
 
 function resolveStockApiBase() {
