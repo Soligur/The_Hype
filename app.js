@@ -107,13 +107,13 @@ async function runAnalysis() {
   const negative = comments.negative.length || simulated.negative;
   const sentimentScore = Math.round((positive / (positive + negative)) * 100);
 
-  renderGraph(simulated.dailyMentions);
+  renderGraph(simulated.platformSentiment);
   renderLegend();
   renderSentiment(positive, negative);
   renderImportantPosts(ticker, comments);
   renderInvestmentSummary(ticker, simulated.trendStrength, sentimentScore);
 
-  chartTitle.textContent = `${ticker} Social Mentions (Last 30 Days)`;
+  chartTitle.textContent = `${ticker} Social Sentiment by Platform`;
   analysisSection.classList.remove('hidden');
 }
 
@@ -384,27 +384,25 @@ function buildStockSearchUrl(query) {
 }
 
 function generateSocialDataset(ticker) {
-  const days = 30;
   const base = (ticker.charCodeAt(0) || 70) + (ticker.charCodeAt(1) || 40);
-  const dailyMentions = Object.keys(platformConfig).reduce((acc, platform, i) => {
-    acc[platform] = Array.from({ length: days }, (_, day) => {
-      const drift = Math.sin((day + base + i * 2) / 4) * 16;
-      const noise = ((base * (day + 3 + i)) % 11) - 5;
-      const level = 40 + i * 10 + Math.max(0, drift + noise + day * 0.8);
-      return Math.round(level);
-    });
+  const platformSentiment = Object.keys(platformConfig).reduce((acc, platform, i) => {
+    const positiveBase = 120 + i * 35;
+    const negativeBase = 70 + i * 22;
+    const positive = Math.max(20, Math.round(positiveBase + Math.sin((base + i * 5) / 4) * 30));
+    const negative = Math.max(15, Math.round(negativeBase + Math.cos((base + i * 3) / 5) * 22));
+
+    acc[platform] = { positive, negative };
     return acc;
   }, {});
 
-  const totals = Object.values(dailyMentions).flat();
-  const trendStrength = totals[totals.length - 1] - totals[0];
-  const averageMentions = totals.reduce((sum, n) => sum + n, 0) / totals.length;
-  const positive = Math.round(averageMentions * 11 + (base % 35) + trendStrength * 0.9);
-  const negative = Math.max(15, Math.round(averageMentions * 7 + ((200 - base) % 30) - trendStrength * 0.3));
+  const totals = Object.values(platformSentiment);
+  const positive = totals.reduce((sum, platform) => sum + platform.positive, 0);
+  const negative = totals.reduce((sum, platform) => sum + platform.negative, 0);
+  const trendStrength = positive - negative;
   const sentimentScore = Math.round((positive / (positive + negative)) * 100);
 
   return {
-    dailyMentions,
+    platformSentiment,
     positive,
     negative,
     sentimentScore,
@@ -412,7 +410,7 @@ function generateSocialDataset(ticker) {
   };
 }
 
-function renderGraph(seriesByPlatform) {
+function renderGraph(sentimentByPlatform) {
   const ctx = chartCanvas.getContext('2d');
   const width = chartCanvas.width;
   const height = chartCanvas.height;
@@ -422,7 +420,11 @@ function renderGraph(seriesByPlatform) {
 
   ctx.clearRect(0, 0, width, height);
 
-  const allValues = Object.values(seriesByPlatform).flat();
+  const platforms = Object.keys(sentimentByPlatform);
+  const allValues = platforms.flatMap((platform) => [
+    sentimentByPlatform[platform].positive,
+    sentimentByPlatform[platform].negative,
+  ]);
   const maxValue = Math.max(...allValues, 10);
 
   // grid + axes
@@ -445,43 +447,48 @@ function renderGraph(seriesByPlatform) {
 
   ctx.fillStyle = '#aeb4c2';
   ctx.font = '12px Inter, Segoe UI, sans-serif';
-  ctx.fillText('Mentions', 8, 16);
-  ctx.fillText('Days', width - 44, height - 10);
+  ctx.fillText('Posts', 8, 16);
+  ctx.fillText('Platforms', width - 72, height - 10);
 
-  Object.entries(seriesByPlatform).forEach(([platform, points]) => {
-    const color = platformConfig[platform].color;
+  const groupWidth = chartWidth / platforms.length;
+  const barWidth = Math.min(36, groupWidth * 0.32);
 
-    ctx.strokeStyle = platform === 'X' ? '#ffffff' : color;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
+  platforms.forEach((platform, index) => {
+    const centerX = padding.left + index * groupWidth + groupWidth / 2;
+    const positiveValue = sentimentByPlatform[platform].positive;
+    const negativeValue = sentimentByPlatform[platform].negative;
+    const positiveHeight = (positiveValue / maxValue) * chartHeight;
+    const negativeHeight = (negativeValue / maxValue) * chartHeight;
 
-    points.forEach((value, index) => {
-      const x = padding.left + (index / (points.length - 1)) * chartWidth;
-      const y = padding.top + chartHeight - (value / maxValue) * chartHeight;
-      if (index === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    });
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(centerX - barWidth - 3, padding.top + chartHeight - positiveHeight, barWidth, positiveHeight);
 
-    ctx.stroke();
+    ctx.fillStyle = '#ff4d4f';
+    ctx.fillRect(centerX + 3, padding.top + chartHeight - negativeHeight, barWidth, negativeHeight);
+
+    ctx.fillStyle = '#aeb4c2';
+    ctx.font = '12px Inter, Segoe UI, sans-serif';
+    const labelWidth = ctx.measureText(platform).width;
+    ctx.fillText(platform, centerX - labelWidth / 2, height - 12);
   });
 }
 
 function renderLegend() {
   chartLegend.innerHTML = '';
 
-  Object.entries(platformConfig).forEach(([platform, info]) => {
+  [
+    { label: 'Positive', color: '#2ecc71' },
+    { label: 'Negative', color: '#ff4d4f' },
+  ].forEach((entry) => {
     const item = document.createElement('span');
     item.className = 'legend-item';
 
     const swatch = document.createElement('span');
     swatch.className = 'swatch';
-    swatch.style.backgroundColor = platform === 'X' ? '#ffffff' : info.color;
+    swatch.style.backgroundColor = entry.color;
 
     const label = document.createElement('span');
-    label.textContent = platform;
+    label.textContent = entry.label;
 
     item.append(swatch, label);
     chartLegend.append(item);
