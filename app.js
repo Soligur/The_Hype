@@ -463,28 +463,17 @@ function renderGraph(sentimentByPlatform) {
     sentimentByPlatform[platform].positive,
     sentimentByPlatform[platform].negative,
   ]);
-  const largestValue = Math.max(...allValues, 10);
-  const yAxisMax = getNiceScaleUpperBound(largestValue * 1.15);
-  const yTickValues = getTickValues(yAxisMax, 5);
-
-  drawSubtleBackgroundLines(ctx, padding, chartWidth, chartHeight);
+  const maxValue = Math.max(...allValues, 10);
 
   // grid + axes
   ctx.strokeStyle = '#2a2d34';
   ctx.lineWidth = 1;
-  for (let i = 0; i < yTickValues.length; i += 1) {
+  for (let i = 0; i <= 5; i += 1) {
     const y = padding.top + (chartHeight / 5) * i;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
     ctx.lineTo(width - padding.right, y);
     ctx.stroke();
-
-    const tickValue = yTickValues[yTickValues.length - 1 - i];
-    ctx.fillStyle = '#8f97a9';
-    ctx.font = '11px Inter, Segoe UI, sans-serif';
-    const tickLabel = formatYAxisLabel(tickValue);
-    const tickLabelWidth = ctx.measureText(tickLabel).width;
-    ctx.fillText(tickLabel, padding.left - 8 - tickLabelWidth, y + 4);
   }
 
   ctx.strokeStyle = '#7f8897';
@@ -506,8 +495,8 @@ function renderGraph(sentimentByPlatform) {
     const centerX = padding.left + index * groupWidth + groupWidth / 2;
     const positiveValue = sentimentByPlatform[platform].positive;
     const negativeValue = sentimentByPlatform[platform].negative;
-    const positiveHeight = (positiveValue / yAxisMax) * chartHeight;
-    const negativeHeight = (negativeValue / yAxisMax) * chartHeight;
+    const positiveHeight = (positiveValue / maxValue) * chartHeight;
+    const negativeHeight = (negativeValue / maxValue) * chartHeight;
 
     ctx.fillStyle = '#2ecc71';
     ctx.fillRect(centerX - barWidth - 3, padding.top + chartHeight - positiveHeight, barWidth, positiveHeight);
@@ -520,65 +509,6 @@ function renderGraph(sentimentByPlatform) {
     const labelWidth = ctx.measureText(platform).width;
     ctx.fillText(platform, centerX - labelWidth / 2, height - 12);
   });
-}
-
-function getNiceScaleUpperBound(value) {
-  if (value <= 10) {
-    return 10;
-  }
-
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  const normalized = value / magnitude;
-  let niceNormalized;
-
-  if (normalized <= 1) {
-    niceNormalized = 1;
-  } else if (normalized <= 2) {
-    niceNormalized = 2;
-  } else if (normalized <= 5) {
-    niceNormalized = 5;
-  } else {
-    niceNormalized = 10;
-  }
-
-  return niceNormalized * magnitude;
-}
-
-function getTickValues(maxValue, steps) {
-  const stepSize = maxValue / steps;
-  return Array.from({ length: steps + 1 }, (_, index) => Math.round(index * stepSize));
-}
-
-function formatYAxisLabel(value) {
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`;
-  }
-
-  return `${value}`;
-}
-
-function drawSubtleBackgroundLines(ctx, padding, chartWidth, chartHeight) {
-  const xStart = padding.left;
-  const xEnd = padding.left + chartWidth;
-  const yStart = padding.top;
-  const yEnd = padding.top + chartHeight;
-
-  ctx.save();
-  ctx.lineWidth = 1.25;
-
-  ctx.strokeStyle = 'rgba(77, 43, 140, 0.18)';
-  ctx.beginPath();
-  ctx.moveTo(xStart, yEnd - chartHeight * 0.25);
-  ctx.lineTo(xEnd, yStart + chartHeight * 0.18);
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(106, 236, 225, 0.2)';
-  ctx.beginPath();
-  ctx.moveTo(xStart, yEnd - chartHeight * 0.55);
-  ctx.lineTo(xEnd, yStart + chartHeight * 0.46);
-  ctx.stroke();
-
-  ctx.restore();
 }
 
 function renderLegend() {
