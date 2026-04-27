@@ -106,12 +106,14 @@ async function runAnalysis() {
   const positive = comments.positive.length || simulated.positive;
   const negative = comments.negative.length || simulated.negative;
   const sentimentScore = Math.round((positive / (positive + negative)) * 100);
+  const platformSentiment = normalizePlatformSentimentTotals(simulated.platformSentiment, positive, negative);
+  const trendStrength = positive - negative;
 
-  renderGraph(simulated.platformSentiment);
+  renderGraph(platformSentiment);
   renderLegend();
   renderSentiment(positive, negative);
   renderImportantPosts(ticker, comments);
-  renderInvestmentSummary(ticker, simulated.trendStrength, sentimentScore);
+  renderInvestmentSummary(ticker, trendStrength, sentimentScore);
 
   chartTitle.textContent = `${ticker} Social Sentiment by Platform`;
   analysisSection.classList.remove('hidden');
@@ -408,6 +410,42 @@ function generateSocialDataset(ticker) {
     sentimentScore,
     trendStrength,
   };
+}
+
+function normalizePlatformSentimentTotals(platformSentiment, targetPositive, targetNegative) {
+  const platforms = Object.keys(platformSentiment);
+  if (!platforms.length) {
+    return {};
+  }
+
+  const totals = platforms.reduce((acc, platform) => {
+    acc.positive += platformSentiment[platform].positive;
+    acc.negative += platformSentiment[platform].negative;
+    return acc;
+  }, { positive: 0, negative: 0 });
+
+  const adjusted = {};
+  let positiveAssigned = 0;
+  let negativeAssigned = 0;
+
+  platforms.forEach((platform, index) => {
+    const isLast = index === platforms.length - 1;
+    const positiveValue = isLast
+      ? Math.max(0, targetPositive - positiveAssigned)
+      : Math.max(0, Math.round((platformSentiment[platform].positive / Math.max(totals.positive, 1)) * targetPositive));
+    const negativeValue = isLast
+      ? Math.max(0, targetNegative - negativeAssigned)
+      : Math.max(0, Math.round((platformSentiment[platform].negative / Math.max(totals.negative, 1)) * targetNegative));
+
+    positiveAssigned += positiveValue;
+    negativeAssigned += negativeValue;
+    adjusted[platform] = {
+      positive: positiveValue,
+      negative: negativeValue,
+    };
+  });
+
+  return adjusted;
 }
 
 function renderGraph(sentimentByPlatform) {
