@@ -452,28 +452,42 @@ function renderGraph(sentimentByPlatform) {
   const ctx = chartCanvas.getContext('2d');
   const width = chartCanvas.width;
   const height = chartCanvas.height;
-  const padding = { top: 20, right: 24, bottom: 34, left: 44 };
+  const padding = { top: 24, right: 24, bottom: 40, left: 72 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
+  const yTickCount = 6;
 
   ctx.clearRect(0, 0, width, height);
 
   const platforms = Object.keys(sentimentByPlatform);
+  if (!platforms.length) {
+    return;
+  }
+
   const allValues = platforms.flatMap((platform) => [
     sentimentByPlatform[platform].positive,
     sentimentByPlatform[platform].negative,
   ]);
-  const maxValue = Math.max(...allValues, 10);
+  const observedMaxValue = Math.max(...allValues, 10);
+  const axisStep = getNiceAxisStep(observedMaxValue, yTickCount);
+  const maxValue = axisStep * yTickCount;
 
   // grid + axes
   ctx.strokeStyle = '#2a2d34';
   ctx.lineWidth = 1;
-  for (let i = 0; i <= 5; i += 1) {
-    const y = padding.top + (chartHeight / 5) * i;
+  for (let i = 0; i <= yTickCount; i += 1) {
+    const y = padding.top + (chartHeight / yTickCount) * i;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
     ctx.lineTo(width - padding.right, y);
     ctx.stroke();
+
+    const tickValue = maxValue - i * axisStep;
+    ctx.fillStyle = '#8f98a8';
+    ctx.font = '12px Inter, Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(Math.max(0, tickValue).toLocaleString(), padding.left - 10, y);
   }
 
   ctx.strokeStyle = '#7f8897';
@@ -485,8 +499,10 @@ function renderGraph(sentimentByPlatform) {
 
   ctx.fillStyle = '#aeb4c2';
   ctx.font = '12px Inter, Segoe UI, sans-serif';
-  ctx.fillText('Posts', 8, 16);
-  ctx.fillText('Platforms', width - 72, height - 10);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('Comments', 14, 18);
+  ctx.fillText('Platforms', width - 80, height - 12);
 
   const groupWidth = chartWidth / platforms.length;
   const barWidth = Math.min(36, groupWidth * 0.32);
@@ -506,9 +522,30 @@ function renderGraph(sentimentByPlatform) {
 
     ctx.fillStyle = '#aeb4c2';
     ctx.font = '12px Inter, Segoe UI, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
     const labelWidth = ctx.measureText(platform).width;
     ctx.fillText(platform, centerX - labelWidth / 2, height - 12);
   });
+}
+
+function getNiceAxisStep(maxValue, tickCount) {
+  const roughStep = Math.max(maxValue, 1) / Math.max(tickCount, 1);
+  const power = 10 ** Math.floor(Math.log10(roughStep));
+  const normalized = roughStep / power;
+
+  let niceNormalized;
+  if (normalized <= 1) {
+    niceNormalized = 1;
+  } else if (normalized <= 2) {
+    niceNormalized = 2;
+  } else if (normalized <= 5) {
+    niceNormalized = 5;
+  } else {
+    niceNormalized = 10;
+  }
+
+  return niceNormalized * power;
 }
 
 function renderLegend() {
